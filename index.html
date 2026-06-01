@@ -198,7 +198,7 @@
     const airborneStartSpeedKmh = 100;
     const airborneStopSpeedKmh = 30;
     let viaMarkers = [];
-
+    let latestDropTimes = [];
     const map = L.map("map").setView([38.7, 23.7], 6);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:18, attribution:"© OpenStreetMap"}).addTo(map);
 
@@ -632,17 +632,44 @@
         setText("dashLastLanding", lastLanding ? fmtTime(lastLanding) : "-");
         setText("dashFireDist", `${D.toFixed(1)} km`);
         setText("dashLimit", maxDrops === 0 ? "ΑΝΕΠΑΡΚΗΣ" : limiting);
+        function formatUntil(target, now) {
+  const diffMin = Math.round((target.getTime() - now.getTime()) / 60000);
+  if (diffMin < 0) return "πέρασε";
 
-        let html = "<b>Ώρες ρίψεων</b><table class=\"drop-table\"><tr><th>#</th><th>Ώρα</th></tr>";
-        if (maxDrops === 0) html += "Δεν επιτρέπεται ρίψη με τα τρέχοντα δεδομένα.";
-        else {
-          for (let i=1; i<=maxDrops; i++) {
-            const dropTime = addMinutes(firstDrop, (i-1)*cycleMin);
-            html += `<tr><td>${i}</td><td>${fmtTime(dropTime)}</td></tr>`;
-          }
-        }
-        if (maxDrops > 0) html += "</table>";
-        dropsDiv.innerHTML = html;
+  const h = Math.floor(diffMin / 60);
+  const m = diffMin % 60;
+
+  return h > 0 ? `${h}ω ${m}'` : `${m}'`;
+}
+
+function updateDropCountdowns() {
+  const now = new Date();
+
+  latestDropTimes.forEach((dt, idx) => {
+    const el = document.getElementById(`dropCountdown${idx + 1}`);
+    if (el) el.textContent = formatUntil(dt, now);
+  });
+}
+let html = "<b>Ώρες ρίψεων</b><table class=\"drop-table\"><tr><th>#</th><th>Ώρα</th><th>Σε πόση ώρα</th></tr>";
+
+latestDropTimes = [];
+
+if (maxDrops === 0) {
+  html += "</table>Δεν επιτρέπεται ρίψη με τα τρέχοντα δεδομένα.";
+} else {
+  const nowForCountdown = new Date();
+
+  for (let i=1; i<=maxDrops; i++) {
+    const dropTime = addMinutes(firstDrop, (i-1)*cycleMin);
+    latestDropTimes.push(dropTime);
+
+    html += `<tr><td>${i}</td><td>${fmtTime(dropTime)}</td><td id="dropCountdown${i}">${formatUntil(dropTime, nowForCountdown)}</td></tr>`;
+  }
+
+  html += "</table>";
+}
+
+dropsDiv.innerHTML = html;
 
         updateFuel(maxDrops, D, altD, missionDurationMin);
 
