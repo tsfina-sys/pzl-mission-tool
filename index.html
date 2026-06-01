@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PZL Mission Tool v8.2 Cockpit</title>
+  <meta name="theme-color" content="#0f3d5e" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="PZL Mission Tool" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root { --blue:#0f3d5e; --panel:#fff; --bg:#eef2f6; --text:#172033; --muted:#667085; --line:#d0d5dd; --soft:#f8fafc; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial,sans-serif; background:var(--bg); color:var(--text); }
+    #app { display:flex; flex-direction:column; height:100vh; }
+    header { height:42px; display:flex; align-items:center; justify-content:space-between; padding:0 12px; background:var(--blue); color:#fff; font-weight:bold; }
+    header span:last-child { font-size:12px; opacity:.9; }
+    #mapWrap { position:relative; flex:1; min-height:46vh; }
+    #map { position:absolute; inset:42px 0 0 0; width:100%; height:calc(100% - 42px); }
+    .map-actions { position:absolute; top:54px; right:10px; z-index:800; display:flex; flex-direction:column; gap:8px; }
+    .map-actions button { box-shadow:0 2px 8px rgba(0,0,0,.25); padding:9px; }
+    .bottom-sheet { background:var(--panel); border-radius:18px 18px 0 0; box-shadow:0 -4px 16px rgba(0,0,0,.18); max-height:54vh; overflow:auto; padding:10px 10px 18px; }
+    .dashboard { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:10px; }
+    .dash-card { background:var(--soft); border:1px solid var(--line); border-radius:12px; padding:8px; min-height:60px; }
+    .dash-card.good { border-color:#75c487; background:#eef7ee; }
+    .dash-card.warn { border-color:#f5c542; background:#fff7df; }
+    .dash-card.bad { border-color:#f08a7a; background:#fff0ec; }
+    .label { font-size:11px; color:var(--muted); font-weight:bold; text-transform:uppercase; }
+    .value { font-size:17px; font-weight:bold; margin-top:4px; line-height:1.1; }
+    .value.smallv { font-size:14px; }
+    .primary-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+    .row { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; align-items:center; }
+    button,input,select { padding:10px; font-size:15px; border-radius:10px; border:1px solid #bbb; }
+    button { background:#0f6ab4; color:white; border:none; cursor:pointer; font-weight:bold; }
+    button.secondary { background:#6b7280; }
+    button.danger { background:#b42318; }
+    button.active { background:#157347; }
+    input,select { flex:1; min-width:120px; background:white; }
+    .section-title { margin:12px 0 8px; padding:8px; background:#d9eaf7; border-radius:10px; font-weight:bold; }
+    .result { background:#eef7ee; border:1px solid #b7dfb7; padding:10px; border-radius:10px; font-size:14px; line-height:1.45; white-space:pre-line; }
+    .small { font-size:12px; color:var(--muted); margin-bottom:8px; }
+    details { border:1px solid var(--line); border-radius:12px; padding:8px; margin-top:8px; background:#fff; }
+    summary { font-weight:bold; cursor:pointer; padding:4px; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    label { font-size:12px; font-weight:bold; color:#344054; display:block; margin-bottom:3px; }
+    .drop-table { width:100%; border-collapse:collapse; margin-top:6px; }
+    .drop-table th,.drop-table td { border-bottom:1px solid #e5e7eb; padding:6px; text-align:left; }
+    .flight-status { font-size:15px; font-weight:bold; padding:8px; border-radius:10px; background:#f8fafc; border:1px solid #d0d5dd; margin-bottom:8px; }
+    .analog-gauge-wrap { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; margin-top:10px; }
+    .analog-gauge { width:170px; height:122px; border:5px solid #111827; border-radius:90px 90px 18px 18px; position:relative; background:#161a22; overflow:hidden; box-shadow:inset 0 0 18px rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.35); }
+    .gauge-arc { position:absolute; left:20px; top:26px; width:130px; height:82px; border-top:5px solid #f8fafc; border-radius:90px 90px 0 0; }
+    .gauge-title { position:absolute; left:0; right:0; top:64px; text-align:center; color:#f8fafc; font-size:20px; font-weight:bold; }
+    .gauge-center { position:absolute; width:12px; height:12px; background:#f8fafc; border-radius:50%; left:79px; top:94px; z-index:5; }
+    .needle { position:absolute; width:4px; height:70px; background:#f8fafc; left:83px; top:29px; transform-origin:50% 66px; transform:rotate(-72deg); border-radius:4px; z-index:4; }
+    .gauge-mark { position:absolute; color:#f8fafc; font-weight:bold; font-size:16px; transform:translate(-50%,-50%); }
+    .mark-e { left:28px; top:85px; font-size:23px; } .mark-14 { left:48px; top:33px; } .mark-12 { left:86px; top:20px; } .mark-34 { left:127px; top:33px; } .mark-f { left:148px; top:85px; font-size:23px; }
+    .tick { position:absolute; width:4px; height:21px; background:#f8fafc; left:83px; top:31px; transform-origin:50% 68px; }
+    .tick-e { transform:rotate(-72deg); } .tick-14 { transform:rotate(-36deg); } .tick-12 { transform:rotate(0deg); height:25px; } .tick-34 { transform:rotate(36deg); } .tick-f { transform:rotate(72deg); }
+    .gauge-value { text-align:center; font-size:13px; margin-top:6px; font-weight:bold; }
+    @media (min-width:900px) { #app { flex-direction:row; } #mapWrap { height:100vh; min-height:100vh; flex:1.65; } #map { inset:42px 0 0 0; } .bottom-sheet { border-radius:0; max-height:100vh; width:440px; overflow:auto; } .dashboard { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:480px) { .dashboard { grid-template-columns:repeat(2,1fr); } .value { font-size:16px; } .bottom-sheet { max-height:55vh; } }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="mapWrap">
+    <header><span>PZL Mission Tool v8.2</span><span>Cockpit</span></header>
+    <div id="map"></div>
+    <div class="map-actions">
+      <button id="lockMapBtn" class="secondary">🔓 Lock</button>
+      <button id="fireModeBtn" class="active">🔥 Fire</button>
+      <button id="viaModeBtn" class="secondary">🟡 Via</button>
+      <button id="clearViaBtn" class="danger">Clear</button>
+    </div>
+  </div>
+  <div class="bottom-sheet">
+    <div class="dashboard">
+      <div class="dash-card good"><div class="label">Κλιμάκιο</div><div id="dashBase" class="value">ΜΥΤΙΛΗΝΗ</div></div>
+      <div class="dash-card"><div class="label">Εναλλακτικό</div><div id="dashAlt" class="value">ΧΙΟΣ</div></div>
+      <div class="dash-card"><div class="label">GS</div><div id="dashGS" class="value">-</div></div>
+      <div class="dash-card"><div class="label">Airborne</div><div id="dashAirborne" class="value">00:00</div><div id="dashAirborneState" class="label">ΟΧΙ</div></div>
+      <div class="dash-card warn"><div class="label">Joker</div><div id="dashJoker" class="value">-</div></div>
+      <div class="dash-card"><div class="label">Bingo</div><div id="dashBingo" class="value">-</div></div>
+      <div id="dashFuelCard" class="dash-card"><div class="label">Fuel</div><div id="dashFuel" class="value">726 L</div></div>
+      <div class="dash-card"><div class="label">Ρίψεις</div><div id="dashDrops" class="value">-</div></div>
+      <div class="dash-card"><div class="label">1η ρίψη</div><div id="dashFirstDrop" class="value smallv">-</div></div>
+      <div class="dash-card"><div class="label">Τελ. Π/Γ</div><div id="dashLastLanding" class="value smallv">-</div></div>
+      <div class="dash-card"><div class="label">Cutoff</div><div id="dashCutoff" class="value smallv">-</div></div>
+      <div class="dash-card"><div class="label">Περιορισμός</div><div id="dashLimit" class="value smallv">-</div></div>
+    </div>
+    <div class="primary-grid"><select id="baseSelect"></select><button id="takeoffBtn">Εντολή Α/Γ τώρα</button></div>
+    <div class="row"><input id="manualTime" type="time" step="60" /><button class="secondary" id="setManualTimeBtn">Χειροκίνητη ώρα</button></div>
+    <div class="row"><input id="searchBox" placeholder="Αναζήτηση φωτιάς π.χ. Πλωμάρι" /><button id="searchBtn">Αναζήτηση</button></div>
+    <div id="mapLockStatus" class="small">Χάρτης: ξεκλείδωτος</div>
+
+    <div class="section-title">Live GPS</div>
+    <div class="row"><button id="gpsBtn">Ενεργοποίηση GPS</button><button id="useGpsAsStartBtn" class="secondary">Χρήση GPS ως αφετηρία</button></div>
+    <div id="flightStatus" class="flight-status">AIRBORNE: ΟΧΙ | Airborne time: 00:00 | Υπολογισμένη κατανάλωση: 0 L</div>
+    <div id="gpsResult" class="result">GPS ανενεργό.</div>
+
+    <details open><summary>Αποστολή / Ρίψεις</summary><div id="result" class="result">Αναμονή δεδομένων...</div><div id="drops" class="drop-list"></div></details>
+
+    <details open><summary>Καύσιμα</summary>
+      <div class="grid2">
+        <div><label>Κατανάλωση L/h</label><input id="fuelBurn" type="number" value="165" min="100" max="250" /></div>
+        <div><label>Αρχικό ανά δεξαμενή L</label><input id="initialTankFuel" type="number" value="356" min="0" max="356" /></div>
+        <div><label>Reserve Bingo L</label><input id="reserveFuel" type="number" value="0" min="0" /></div>
+        <div><label>Reserve Joker L</label><input id="jokerReserveFuel" type="number" value="0" min="0" /></div>
+      </div>
+      <div id="fuelResult" class="result">Αναμονή δεδομένων καυσίμων...</div>
+      <div class="analog-gauge-wrap">
+        <div><div class="analog-gauge"><div class="gauge-arc"></div><div class="tick tick-e"></div><div class="tick tick-14"></div><div class="tick tick-12"></div><div class="tick tick-34"></div><div class="tick tick-f"></div><div class="gauge-mark mark-e">E</div><div class="gauge-mark mark-14">1/4</div><div class="gauge-mark mark-12">1/2</div><div class="gauge-mark mark-34">3/4</div><div class="gauge-mark mark-f">F</div><div class="gauge-title">FUEL QTY.</div><div id="leftNeedle" class="needle"></div><div class="gauge-center"></div></div><div class="gauge-value">Αριστερή: <span id="leftGaugeText">356 L</span></div></div>
+        <div><div class="analog-gauge"><div class="gauge-arc"></div><div class="tick tick-e"></div><div class="tick tick-14"></div><div class="tick tick-12"></div><div class="tick tick-34"></div><div class="tick tick-f"></div><div class="gauge-mark mark-e">E</div><div class="gauge-mark mark-14">1/4</div><div class="gauge-mark mark-12">1/2</div><div class="gauge-mark mark-34">3/4</div><div class="gauge-mark mark-f">F</div><div class="gauge-title">FUEL QTY.</div><div id="rightNeedle" class="needle"></div><div class="gauge-center"></div></div><div class="gauge-value">Δεξιά: <span id="rightGaugeText">356 L</span></div></div>
+      </div>
+      <div class="small">+14 L μη ενδεικνυόμενα. Συνολικό πλήρες καύσιμο: 726 L.</div>
+    </details>
+
+    <details><summary>Άνεμος / Διάδρομος</summary>
+      <div class="grid2">
+        <div><label>Διάδρομος heading °</label><input id="runwayHeading" type="number" value="010" min="0" max="360" /></div>
+        <div><label>Άνεμος από °</label><input id="windDir" type="number" value="000" min="0" max="360" /></div>
+        <div><label>Ένταση kts</label><input id="windSpeed" type="number" value="0" min="0" /></div>
+        <div><label>Ριπές kts</label><input id="windGust" type="number" value="0" min="0" /></div>
+      </div>
+      <div id="windResult" class="result">Αναμονή δεδομένων ανέμου...</div>
+    </details>
+    <details><summary>Άνεμος πυρκαγιάς</summary>
+      <div class="grid2">
+        <div><label>Διεύθυνση από °</label><input id="fireWindDir" type="number" value="000" min="0" max="360" /></div>
+        <div><label>Ένταση kts</label><input id="fireWindSpeed" type="number" value="0" min="0" /></div>
+      </div>
+      <div id="fireWindResult" class="result">Αναμονή δεδομένων ανέμου φωτιάς...</div>
+    </details>
+    <div class="small">Βοηθητικό προσωπικό εργαλείο. Όχι πρωτεύον μέσο ναυτιλίας ή επιχειρησιακής απόφασης.</div>
+  </div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+
+    const speedKmPerMin = 3;
+    const readinessMin = 15;
+    const attackCircuitMin = 5;
+    const refillGroundMin = 10;
+    const maxMissionMin = 180;
+    const twilightAfterSunsetMin = 30;
+    const tankCapacityL = 356;
+    const hiddenFuelL = 14;
+    const totalFuelFullL = tankCapacityL * 2 + hiddenFuelL;
+    const minQuarterEachTank = tankCapacityL / 4;
+    const pzlMaxCrosswindKts = 13;
+    const pzlMaxWindKts = 29.5;
+
+    const bases = {
+      "ΚΕΡΚΥΡΑ": {lat:39.6019, lon:19.9117, ref:"ΑΚΤΙΟ", offset:40, alt:"ΑΚΤΙΟ", rwy: 170},
+      "ΑΚΤΙΟ": {lat:38.9255, lon:20.7653, ref:"ΚΕΡΚΥΡΑ", offset:40, alt:"ΚΕΡΚΥΡΑ", rwy: 030},
+      "ΚΑΒΑΛΑ": {lat:40.9133, lon:24.6192, ref:"ΑΛΕΞΑΝΔΡΟΥΠΟΛΗ", offset:40, alt:"ΑΛΕΞΑΝΔΡΟΥΠΟΛΗ", rwy: 050},
+      "ΚΕΦΑΛΛΟΝΙΑ": {lat:38.1201, lon:20.5005, ref:"ΑΝΔΡΑΒΙΔΑ", offset:40, alt:"ΑΝΔΡΑΒΙΔΑ", rwy: 140},
+      "ΤΡΙΠΟΛΗ": {lat:37.5306, lon:22.4036, ref:"ΚΑΛΑΜΑΤΑ", offset:45, alt:"ΚΑΛΑΜΑΤΑ", rwy: 020},
+      "ΛΑΜΙΑ": {lat:38.9010, lon:22.4340, ref:"ΒΟΛΟΣ", offset:25, alt:"ΒΟΛΟΣ", rwy: 130},
+      "ΚΑΛΑΜΑΤΑ": {lat:37.0683, lon:22.0255, ref:"ΤΡΙΠΟΛΗ", offset:45, alt:"ΤΡΙΠΟΛΗ", rwy: 170},
+      "ΜΥΤΙΛΗΝΗ": {lat:39.0567, lon:26.5983, ref:"ΧΙΟΣ", offset:65, alt:"ΧΙΟΣ", rwy: 140},
+      "ΤΑΤΟΪ": {lat:38.1089, lon:23.7838, ref:"ΕΛΕΥΣΙΝΑ", offset:15, alt:"ΕΛΕΥΣΙΝΑ", rwy: 030}
+    };
+
+    const airports = {
+      "ΑΚΤΙΟ": {lat:38.9255, lon:20.7653},
+      "ΚΕΡΚΥΡΑ": {lat:39.6019, lon:19.9117},
+      "ΑΛΕΞΑΝΔΡΟΥΠΟΛΗ": {lat:40.8559, lon:25.9563},
+      "ΑΝΔΡΑΒΙΔΑ": {lat:37.9207, lon:21.2926},
+      "ΚΑΛΑΜΑΤΑ": {lat:37.0683, lon:22.0255},
+      "ΤΡΙΠΟΛΗ": {lat:37.5306, lon:22.4036},
+      "ΒΟΛΟΣ": {lat:39.2196, lon:22.7943},
+      "ΧΙΟΣ": {lat:38.3432, lon:26.1406},
+      "ΕΛΕΥΣΙΝΑ": {lat:38.0638, lon:23.5550}
+    };
+
+    let selectedBaseName = "ΜΥΤΙΛΗΝΗ";
+    let commandTime = null;
+    let firePoint = null;
+    let viaPoints = [];
+    let mode = "fire";
+    let baseMarker = null, fireMarker = null, gpsMarker = null, routeLine = null, altLine = null, rwyLine = null, windLine = null, fireWindLine = null;
+    let gpsWatchId = null;
+    let currentGps = null;
+    let useGpsAsStart = false;
+    let mapLocked = false;
+    let lastGpsPointForSpeed = null;
+
+    // Auto fuel burn logic
+    let isAirborne = false;
+    let airborneMsTotal = 0;
+    let lastAirborneTick = null;
+    let calculatedFuelBurnedL = 0;
+    let lastHeavyCalcTime = 0;
+    const heavyCalcIntervalMs = 30000; // βαριοί υπολογισμοί ανά 30''
+    const airborneStartSpeedKmh = 100;
+    const airborneStopSpeedKmh = 30;
+    let viaMarkers = [];
+
+    const map = L.map("map").setView([38.7, 23.7], 6);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:18, attribution:"© OpenStreetMap"}).addTo(map);
+
+    const baseIcon = L.divIcon({className:"", html:"🔵", iconSize:[24,24], iconAnchor:[12,12]});
+    const fireIcon = L.divIcon({className:"", html:"🔥", iconSize:[28,28], iconAnchor:[14,14]});
+    const viaIcon = L.divIcon({className:"", html:"🟡", iconSize:[24,24], iconAnchor:[12,12]});
+    const altIcon = L.divIcon({className:"", html:"🟣", iconSize:[24,24], iconAnchor:[12,12]});
+    const gpsIcon = L.divIcon({className:"", html:"📍", iconSize:[28,28], iconAnchor:[14,28]});
+
+    const baseSelect = document.getElementById("baseSelect");
+    Object.keys(bases).forEach(name => {
+      const opt = document.createElement("option");
+      opt.value = name; opt.textContent = name;
+      baseSelect.appendChild(opt);
+      const b = bases[name];
+      L.marker([b.lat,b.lon], {icon:baseIcon}).addTo(map).bindPopup(`<b>${name}</b>`).on("click", () => {
+        selectedBaseName = name; baseSelect.value = name; updateBaseMarker(); calculate();
+      });
+    });
+    baseSelect.value = selectedBaseName;
+
+    Object.keys(airports).forEach(name => {
+      const a = airports[name];
+      L.marker([a.lat,a.lon], {icon:altIcon}).addTo(map).bindPopup(`<b>${name}</b>`);
+    });
+
+    function updateBaseMarker() {
+      const b = bases[selectedBaseName];
+      if (baseMarker) map.removeLayer(baseMarker);
+      baseMarker = L.circleMarker([b.lat,b.lon], {radius:10,color:"blue",fillColor:"blue",fillOpacity:.5}).addTo(map).bindPopup("Επιλεγμένο: " + selectedBaseName);
+      document.getElementById("runwayHeading").value = String(b.rwy).padStart(3,"0");
+      map.setView([b.lat,b.lon], 8);
+      drawAll();
+    }
+    updateBaseMarker();
+
+    map.on("click", (e) => {
+      if (mapLocked) {
+        document.getElementById("mapLockStatus").textContent = "Χάρτης: κλειδωμένος — αγνοήθηκε το tap";
+        return;
+      }
+      if (mode === "fire") {
+        firePoint = {lat:e.latlng.lat, lon:e.latlng.lng, label:"Φωτιά"};
+        setFireMarker();
+      } else {
+        viaPoints.push({lat:e.latlng.lat, lon:e.latlng.lng});
+        addViaMarker(e.latlng, viaPoints.length);
+      }
+      calculate();
+    });
+
+    function setFireMarker() {
+      if (fireMarker) map.removeLayer(fireMarker);
+      fireMarker = L.marker([firePoint.lat,firePoint.lon], {icon:fireIcon}).addTo(map).bindPopup("Σημείο φωτιάς");
+      drawAll();
+    }
+    function addViaMarker(latlng, index) {
+      const m = L.marker(latlng,{icon:viaIcon}).addTo(map).bindPopup("Ενδιάμεσο " + index);
+      viaMarkers.push(m); drawAll();
+    }
+    function clearViaMarkers() {
+      if (mapLocked) {
+        const status=document.getElementById("mapLockStatus");
+        if(status) status.textContent="Χάρτης: ΚΛΕΙΔΩΜΕΝΟΣ — το Clear αγνοήθηκε";
+        return;
+      }
+      viaMarkers.forEach(m => map.removeLayer(m));
+      viaMarkers = []; viaPoints = []; drawAll(); calculate();
+    }
+
+    function drawAll() {
+      drawRoute();
+      drawAlternateLine();
+      drawRunwayAndWind();
+      drawFireWind();
+    }
+
+    function drawRoute() {
+      if (routeLine) map.removeLayer(routeLine);
+      if (!firePoint) return;
+      const b = bases[selectedBaseName];
+      const startPoint = (useGpsAsStart && currentGps) ? [currentGps.lat,currentGps.lon] : [b.lat,b.lon];
+      const points = [startPoint, ...viaPoints.map(p=>[p.lat,p.lon]), [firePoint.lat,firePoint.lon]];
+      routeLine = L.polyline(points, {color:"green", weight:4}).addTo(map);
+    }
+
+    function drawAlternateLine() {
+      if (altLine) map.removeLayer(altLine);
+      const b = bases[selectedBaseName];
+      const alt = airports[b.alt];
+      if (!alt) return;
+      altLine = L.polyline([[b.lat,b.lon],[alt.lat,alt.lon]], {color:"#38bdf8", weight:3, dashArray:"6,6"}).addTo(map);
+    }
+
+    function endpointFromBearing(lat, lon, bearingDeg, distanceKm) {
+      const R = 6371;
+      const brng = deg2rad(bearingDeg);
+      const lat1 = deg2rad(lat);
+      const lon1 = deg2rad(lon);
+      const d = distanceKm / R;
+      const lat2 = Math.asin(Math.sin(lat1)*Math.cos(d) + Math.cos(lat1)*Math.sin(d)*Math.cos(brng));
+      const lon2 = lon1 + Math.atan2(Math.sin(brng)*Math.sin(d)*Math.cos(lat1), Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));
+      return {lat: lat2*180/Math.PI, lon: lon2*180/Math.PI};
+    }
+
+    function drawArrow(start, end, color, popupText) {
+      const main = L.polyline([[start.lat,start.lon],[end.lat,end.lon]], {color:color, weight:4}).addTo(map);
+      const bearing = bearingDeg(start, end);
+      const left = endpointFromBearing(end.lat, end.lon, (bearing + 150) % 360, 0.35);
+      const right = endpointFromBearing(end.lat, end.lon, (bearing + 210) % 360, 0.35);
+      const head = L.polyline([[left.lat,left.lon],[end.lat,end.lon],[right.lat,right.lon]], {color:color, weight:4}).addTo(map);
+      if (popupText) {
+        main.bindPopup(popupText);
+        head.bindPopup(popupText);
+      }
+      return L.layerGroup([main, head]).addTo(map);
+    }
+
+    function bearingDeg(a, b) {
+      const lat1 = deg2rad(a.lat);
+      const lat2 = deg2rad(b.lat);
+      const dLon = deg2rad(b.lon - a.lon);
+      const y = Math.sin(dLon) * Math.cos(lat2);
+      const x = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
+      return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
+    function windLimitStatus() {
+      const rwy = Number(document.getElementById("runwayHeading").value || 0);
+      const windFrom = Number(document.getElementById("windDir").value || 0);
+      const windSpeed = Number(document.getElementById("windSpeed").value || 0);
+      const gust = Number(document.getElementById("windGust").value || 0);
+      const effective = Math.max(windSpeed, gust);
+      const angle = normAngleDiff(windFrom, rwy);
+      const cross = Math.abs(effective * Math.sin(deg2rad(angle)));
+      return {effective, cross, out: cross > pzlMaxCrosswindKts || effective > pzlMaxWindKts};
+    }
+
+    function drawRunwayAndWind() {
+      if (rwyLine) map.removeLayer(rwyLine);
+      if (windLine) map.removeLayer(windLine);
+
+      const b = bases[selectedBaseName];
+      const rwy = Number(document.getElementById("runwayHeading").value || b.rwy);
+      const p1 = endpointFromBearing(b.lat,b.lon,(rwy+180)%360,1.2);
+      const p2 = endpointFromBearing(b.lat,b.lon,rwy,1.2);
+      rwyLine = L.polyline([[p1.lat,p1.lon],[p2.lat,p2.lon]], {color:"black", weight:6}).addTo(map).bindPopup("Διάδρομος " + String(Math.round(rwy/10)).padStart(2,"0"));
+
+      const windFrom = Number(document.getElementById("windDir").value || 0);
+      const windTo = (windFrom + 180) % 360;
+      const start = endpointFromBearing(b.lat,b.lon,windFrom,2.2);
+      const end = endpointFromBearing(b.lat,b.lon,windTo,1.0);
+      const st = windLimitStatus();
+      const color = st.out ? "red" : "yellow";
+      windLine = drawArrow(start, end, color, `Άνεμος από ${windFrom}° | κάθετος ${st.cross.toFixed(1)} kts | σύνολο ${st.effective.toFixed(1)} kts`);
+    }
+
+    function drawFireWind() {
+      if (fireWindLine) map.removeLayer(fireWindLine);
+      if (!firePoint) return;
+      const windFrom = Number(document.getElementById("fireWindDir").value || 0);
+      const windTo = (windFrom + 180) % 360;
+      const start = endpointFromBearing(firePoint.lat,firePoint.lon,windFrom,1.8);
+      const end = endpointFromBearing(firePoint.lat,firePoint.lon,windTo,0.8);
+      fireWindLine = drawArrow(start, end, "yellow", "Άνεμος φωτιάς από " + windFrom + "°");
+    }
+
+    baseSelect.addEventListener("change", () => { selectedBaseName = baseSelect.value; updateBaseMarker(); calculate(); });
+    document.getElementById("takeoffBtn").addEventListener("click", () => {
+      commandTime = new Date(); document.getElementById("manualTime").value = toHHMM(commandTime); calculate();
+    });
+    document.getElementById("setManualTimeBtn").addEventListener("click", () => {
+      const value = document.getElementById("manualTime").value;
+      if (!value) return alert("Βάλε ώρα εντολής.");
+      const now = new Date(); const [h,m] = value.split(":").map(Number);
+      commandTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0); calculate();
+    });
+    document.getElementById("fireModeBtn").addEventListener("click", () => { mode="fire"; fireModeBtn.className="active"; viaModeBtn.className="secondary"; });
+    document.getElementById("viaModeBtn").addEventListener("click", () => { mode="via"; viaModeBtn.className="active"; fireModeBtn.className="secondary"; });
+    document.getElementById("clearViaBtn").addEventListener("click", clearViaMarkers);
+
+    document.getElementById("lockMapBtn").addEventListener("click", () => {
+      mapLocked = !mapLocked;
+      const btn = document.getElementById("lockMapBtn");
+      const status = document.getElementById("mapLockStatus");
+
+      if (mapLocked) {
+        btn.textContent = "Ξεκλείδωμα χάρτη";
+        btn.className = "danger";
+        status.textContent = "Χάρτης: ΚΛΕΙΔΩΜΕΝΟΣ — δεν αλλάζει φωτιά/σημεία με tap";
+      } else {
+        btn.textContent = "Κλείδωμα χάρτη";
+        btn.className = "secondary";
+        status.textContent = "Χάρτης: ξεκλείδωτος";
+      }
+    });
+
+    document.getElementById("searchBtn").addEventListener("click", async () => {
+      const q = document.getElementById("searchBox").value.trim();
+      if (!q) return;
+      try {
+        const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=gr&q=" + encodeURIComponent(q);
+        const res = await fetch(url, {headers:{"Accept":"application/json"}});
+        const data = await res.json();
+        if (!data.length) return alert("Δεν βρέθηκε περιοχή.");
+        firePoint = {lat:parseFloat(data[0].lat), lon:parseFloat(data[0].lon), label:data[0].display_name};
+        setFireMarker(); map.setView([firePoint.lat,firePoint.lon],10); calculate();
+      } catch(e) { alert("Σφάλμα αναζήτησης περιοχής."); }
+    });
+
+    
+    document.getElementById("gpsBtn").addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        alert("Το GPS δεν υποστηρίζεται από τον browser.");
+        return;
+      }
+
+      if (gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+        gpsWatchId = null;
+        document.getElementById("gpsBtn").textContent = "Ενεργοποίηση GPS";
+        document.getElementById("gpsResult").textContent = "GPS ανενεργό.";
+        if (isAirborne && lastAirborneTick) {
+          const now = new Date();
+          airborneMsTotal += now.getTime() - lastAirborneTick.getTime();
+        }
+        isAirborne = false;
+        lastAirborneTick = null;
+        updateFlightStatus();
+        return;
+      }
+
+      gpsWatchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const c = pos.coords;
+          const now = new Date();
+          let speedMps = c.speed;
+
+          if ((speedMps === null || isNaN(speedMps)) && lastGpsPointForSpeed) {
+            const dt = (now.getTime() - lastGpsPointForSpeed.time.getTime()) / 1000;
+            const distKm = haversineKm(
+              {lat:lastGpsPointForSpeed.lat, lon:lastGpsPointForSpeed.lon},
+              {lat:c.latitude, lon:c.longitude}
+            );
+            if (dt > 0) speedMps = (distKm * 1000) / dt;
+          }
+
+          currentGps = {
+            lat: c.latitude,
+            lon: c.longitude,
+            accuracy: c.accuracy,
+            speedMps: speedMps,
+            time: now
+          };
+
+          lastGpsPointForSpeed = {lat:c.latitude, lon:c.longitude, time:now};
+
+          if (gpsMarker) map.removeLayer(gpsMarker);
+          gpsMarker = L.marker([c.latitude, c.longitude], {icon:gpsIcon})
+            .addTo(map)
+            .bindPopup("Τρέχουσα θέση GPS");
+
+          document.getElementById("gpsBtn").textContent = "Απενεργοποίηση GPS";
+
+          const speedKmh = speedMps && !isNaN(speedMps) ? speedMps * 3.6 : null;
+          const speedKt = speedKmh ? speedKmh / 1.852 : null;
+
+          updateAirborneAndFuel(now, speedKmh);
+
+          let text =
+            `Θέση: ${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}\n` +
+            `Ακρίβεια: ±${c.accuracy.toFixed(0)} m\n`;
+
+          if (speedKmh) {
+            text += `Ground Speed: ${speedKmh.toFixed(0)} km/h / ${speedKt.toFixed(0)} kt\n`;
+            setText("dashGS", `${speedKmh.toFixed(0)} km/h`);
+          } else {
+            text += "Ground Speed: μη διαθέσιμο ακόμα\n";
+            setText("dashGS", "-");
+          }
+
+          if (firePoint) {
+            const dFire = haversineKm({lat:c.latitude, lon:c.longitude}, firePoint);
+            text += `Direct έως φωτιά: ${dFire.toFixed(1)} km\n`;
+            if (speedKmh && speedKmh > 20) {
+              text += `ETA φωτιάς με GPS GS: ${(dFire / speedKmh * 60).toFixed(0)}'\n`;
+            }
+          }
+
+          const base = bases[selectedBaseName];
+          const alt = airports[base.alt];
+          const dAlt = haversineKm({lat:c.latitude, lon:c.longitude}, alt);
+          text += `Direct έως εναλλακτικό ${base.alt}: ${dAlt.toFixed(1)} km\n`;
+          if (speedKmh && speedKmh > 20) {
+            text += `ETA εναλλακτικού με GPS GS: ${(dAlt / speedKmh * 60).toFixed(0)}'`;
+          }
+
+          document.getElementById("gpsResult").textContent = text;
+
+          // Ελαφρύ update σε κάθε GPS fix: μόνο status/gauges.
+          updateFlightStatus();
+
+          // Βαρύς υπολογισμός/refresh οθόνης μόνο ανά 30'', για να μη τρεμοπαίζει.
+          if (now.getTime() - lastHeavyCalcTime > heavyCalcIntervalMs) {
+            lastHeavyCalcTime = now.getTime();
+            drawAll();
+            calculate();
+          }
+        },
+        (err) => {
+          document.getElementById("gpsResult").textContent = "Σφάλμα GPS: " + err.message;
+        },
+        {enableHighAccuracy:true, maximumAge:1000, timeout:10000}
+      );
+    });
+
+    document.getElementById("useGpsAsStartBtn").addEventListener("click", () => {
+      if (!currentGps) {
+        alert("Ενεργοποίησε πρώτα το GPS.");
+        return;
+      }
+      useGpsAsStart = !useGpsAsStart;
+      document.getElementById("useGpsAsStartBtn").textContent =
+        useGpsAsStart ? "Αφετηρία: GPS" : "Χρήση GPS ως αφετηρία";
+      document.getElementById("useGpsAsStartBtn").className =
+        useGpsAsStart ? "active" : "secondary";
+      drawAll();
+      calculate();
+    });
+
+
+    ["fuelBurn","initialTankFuel","reserveFuel","jokerReserveFuel","runwayHeading","windDir","windSpeed","windGust","fireWindDir","fireWindSpeed"].forEach(id => {
+      document.getElementById(id).addEventListener("input", () => { drawAll(); calculate(); });
+    });
+
+    function haversineKm(a,b) {
+      const R=6371, dLat=deg2rad(b.lat-a.lat), dLon=deg2rad(b.lon-a.lon), lat1=deg2rad(a.lat), lat2=deg2rad(b.lat);
+      const x=Math.sin(dLat/2)**2 + Math.sin(dLon/2)**2*Math.cos(lat1)*Math.cos(lat2);
+      return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+    }
+    function deg2rad(deg){ return deg*Math.PI/180; }
+    function normAngleDiff(a,b) {
+      let d = Math.abs((a-b+180)%360-180);
+      return d;
+    }
+    function routeDistanceKm() {
+      if (!firePoint) return null;
+      const b = bases[selectedBaseName];
+      const start = (useGpsAsStart && currentGps) ? {lat:currentGps.lat, lon:currentGps.lon} : {lat:b.lat,lon:b.lon};
+      const points = [start, ...viaPoints, {lat:firePoint.lat,lon:firePoint.lon}];
+      let total=0; for(let i=0;i<points.length-1;i++) total += haversineKm(points[i],points[i+1]);
+      return total;
+    }
+    function alternateDistanceKm() {
+      const b = bases[selectedBaseName], alt = airports[b.alt];
+      return haversineKm({lat:b.lat,lon:b.lon}, alt);
+    }
+
+    async function getCutoffTime() {
+      const base = bases[selectedBaseName];
+      const ref = airports[base.ref];
+      const url = `https://api.sunrise-sunset.org/json?lat=${ref.lat}&lng=${ref.lon}&formatted=0`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.status !== "OK") throw new Error("Sunset API error");
+      const sunset = new Date(data.results.sunset);
+      const twilight = new Date(sunset.getTime() + twilightAfterSunsetMin*60000);
+      const cutoff = new Date(twilight.getTime() - base.offset*60000);
+      return {sunset, twilight, cutoff, refName:base.ref, offset:base.offset};
+    }
+
+    let lastCalcId = 0;
+    async function calculate() {
+      const calcId = ++lastCalcId;
+      const result = document.getElementById("result"), dropsDiv = document.getElementById("drops");
+      const fuelResult = document.getElementById("fuelResult");
+      const D = routeDistanceKm();
+
+      updateWindResult();
+      updateFireWindResult();
+
+      if (!commandTime || !firePoint || D === null) {
+        result.textContent = "Συμπλήρωσε κλιμάκιο, ώρα εντολής και σημείο φωτιάς.";
+        dropsDiv.innerHTML = "";
+        fuelResult.textContent = "Αναμονή δεδομένων καυσίμων...";
+        updateFuelGauges(Number(initialTankFuel.value), Number(initialTankFuel.value));
+        return;
+      }
+
+      result.textContent = "Υπολογισμός...";
+      try {
+        const cutoffInfo = await getCutoffTime();
+        if (calcId !== lastCalcId) return;
+
+        const cycleMin = 2*D/speedKmPerMin + refillGroundMin + attackCircuitMin;
+        const maxBy3Hours = Math.floor((maxMissionMin + refillGroundMin)/cycleMin);
+        const availableToCutoffMin = (cutoffInfo.cutoff.getTime()-commandTime.getTime())/60000;
+        const maxByCutoff = Math.floor((availableToCutoffMin - attackCircuitMin)/cycleMin);
+        const maxDrops = Math.max(0, Math.min(maxBy3Hours, maxByCutoff));
+
+        const firstDrop = addMinutes(commandTime, readinessMin + D/speedKmPerMin + attackCircuitMin);
+        const missionDurationMin = maxDrops>0 ? maxDrops*cycleMin - refillGroundMin : 0;
+        const firstTakeoff = addMinutes(commandTime, readinessMin);
+        const lastLanding = maxDrops>0 ? addMinutes(firstTakeoff, missionDurationMin) : null;
+
+        const altD = alternateDistanceKm();
+        const altTimeMin = altD / speedKmPerMin;
+        const base = bases[selectedBaseName];
+
+        let limiting = "ΚΑΙ ΤΑ ΔΥΟ";
+        if (maxBy3Hours < maxByCutoff) limiting = "3 ΩΡΕΣ";
+        if (maxByCutoff < maxBy3Hours) limiting = "ΤΦ / CUT OFF";
+
+        result.textContent =
+          `Κλιμάκιο: ${selectedBaseName}\n` +
+          `Εναλλακτικό: ${base.alt} | Direct: ${altD.toFixed(1)} km | Χρόνος: ${altTimeMin.toFixed(0)}'\n` +
+          `Δύση ηλίου ${cutoffInfo.refName}: ${fmtTime(cutoffInfo.sunset)}\n` +
+          `ΤΦ ${cutoffInfo.refName}: ${fmtTime(cutoffInfo.twilight)}\n` +
+          `CUT OFF: ${fmtTime(cutoffInfo.cutoff)} (ΤΦ - ${cutoffInfo.offset}')\n` +
+          `Απόσταση διαδρομής προς φωτιά: ${D.toFixed(1)} km${useGpsAsStart ? ' (αφετηρία GPS)' : ''}\n` +
+          `Ώρα εντολής: ${fmtTime(commandTime)}\n` +
+          `Ώρα πρώτης ρίψης: ${fmtTime(firstDrop)}\n` +
+          `Μέγιστες ρίψεις: ${maxDrops}\n` +
+          `Τελευταία Π/Γ: ${lastLanding ? fmtTime(lastLanding) : "-"}\n` +
+          `Περιορισμός: ${maxDrops === 0 ? "ΑΝΕΠΑΡΚΗΣ ΧΡΟΝΟΣ" : limiting}`;
+        setText("dashBase", selectedBaseName);
+        setText("dashAlt", base.alt);
+        setText("dashDrops", String(maxDrops));
+        setText("dashFirstDrop", fmtTime(firstDrop));
+        setText("dashCutoff", fmtTime(cutoffInfo.cutoff));
+        setText("dashLastLanding", lastLanding ? fmtTime(lastLanding) : "-");
+        setText("dashFireDist", `${D.toFixed(1)} km`);
+        setText("dashLimit", maxDrops === 0 ? "ΑΝΕΠΑΡΚΗΣ" : limiting);
+
+        let html = "<b>Ώρες ρίψεων</b><table class=\"drop-table\"><tr><th>#</th><th>Ώρα</th></tr>";
+        if (maxDrops === 0) html += "Δεν επιτρέπεται ρίψη με τα τρέχοντα δεδομένα.";
+        else {
+          for (let i=1; i<=maxDrops; i++) {
+            const dropTime = addMinutes(firstDrop, (i-1)*cycleMin);
+            html += `<tr><td>${i}</td><td>${fmtTime(dropTime)}</td></tr>`;
+          }
+        }
+        if (maxDrops > 0) html += "</table>";
+        dropsDiv.innerHTML = html;
+
+        updateFuel(maxDrops, D, altD, missionDurationMin);
+
+      } catch(err) {
+        result.textContent = "Δεν μπόρεσα να πάρω αυτόματα ΤΦ από διαδίκτυο.\nΣφάλμα: " + err.message;
+      }
+    }
+
+
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+
+    function updateAirborneAndFuel(now, speedKmh) {
+      const burn = Number(document.getElementById("fuelBurn").value || 165);
+
+      if (speedKmh !== null && !isNaN(speedKmh)) {
+        if (!isAirborne && speedKmh > airborneStartSpeedKmh) {
+          isAirborne = true;
+          lastAirborneTick = now;
+        } else if (isAirborne && speedKmh < airborneStopSpeedKmh) {
+          if (lastAirborneTick) {
+            airborneMsTotal += now.getTime() - lastAirborneTick.getTime();
+          }
+          isAirborne = false;
+          lastAirborneTick = null;
+        }
+      }
+
+      if (isAirborne && lastAirborneTick) {
+        const dtMs = now.getTime() - lastAirborneTick.getTime();
+        if (dtMs > 0) {
+          const dtHours = dtMs / 3600000;
+          calculatedFuelBurnedL += burn * dtHours;
+          airborneMsTotal += dtMs;
+          lastAirborneTick = now;
+        }
+      }
+
+      // Άμεση ενημέρωση ενδείξεων καυσίμου χωρίς πλήρες refresh.
+      updateFuelOnlyFromBurn();
+    }
+
+    function currentAirborneMs() {
+      return airborneMsTotal;
+    }
+
+    function formatDuration(ms) {
+      const totalMin = Math.floor(ms / 60000);
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+    }
+
+    function updateFuelOnlyFromBurn() {
+      const initialEach = Math.min(tankCapacityL, Number(document.getElementById("initialTankFuel").value || 356));
+      const totalInitial = initialEach * 2 + hiddenFuelL;
+      const remainingTotalNow = Math.max(0, totalInitial - calculatedFuelBurnedL);
+      const indicatedRemainingTotalNow = Math.max(0, remainingTotalNow - hiddenFuelL);
+      const remainingEachNow = Math.min(tankCapacityL, indicatedRemainingTotalNow / 2);
+      updateFuelGauges(remainingEachNow, remainingEachNow);
+    }
+
+    function updateFlightStatus() {
+      const status = isAirborne ? "ΝΑΙ" : "ΟΧΙ";
+      document.getElementById("flightStatus").textContent =
+        `AIRBORNE: ${status} | Airborne time: ${formatDuration(currentAirborneMs())} | Υπολογισμένη κατανάλωση: ${calculatedFuelBurnedL.toFixed(1)} L`;
+      setText("dashAirborne", formatDuration(currentAirborneMs()));
+      setText("dashAirborneState", status);
+    }
+
+
+    function updateFuel(maxDrops, D, altD, missionDurationMin) {
+      const burn = Number(document.getElementById("fuelBurn").value || 165);
+      const initialEach = Math.min(tankCapacityL, Number(document.getElementById("initialTankFuel").value || 356));
+      const reserve = Number(document.getElementById("reserveFuel").value || 0);
+      const jokerReserve = Number(document.getElementById("jokerReserveFuel").value || 0);
+
+      const totalInitial = initialEach*2 + hiddenFuelL;
+      const remainingTotalNow = Math.max(0, totalInitial - calculatedFuelBurnedL);
+      const indicatedRemainingTotalNow = Math.max(0, remainingTotalNow - hiddenFuelL);
+      const remainingEachNow = Math.min(tankCapacityL, indicatedRemainingTotalNow / 2);
+
+      const bingoToAltL = burn * (altD/speedKmPerMin) / 60 + reserve;
+      const minQuarterTotal = minQuarterEachTank*2;
+      const bingoL = Math.max(bingoToAltL, minQuarterTotal);
+
+      const jokerL = burn * (D/speedKmPerMin) / 60 + bingoL + jokerReserve;
+
+      let bingoStatus = remainingTotalNow >= bingoL ? "OK" : "ΚΑΤΩ ΑΠΟ BINGO";
+      let jokerStatus = remainingTotalNow >= jokerL ? "OK" : "ΚΑΤΩ ΑΠΟ JOKER";
+
+      updateFuelGauges(remainingEachNow, remainingEachNow);
+
+      document.getElementById("fuelResult").innerHTML =
+        `Εκτιμώμενο συνολικό καύσιμο τώρα: ${remainingTotalNow.toFixed(0)} L από 726 L\n` +
+        `Ενδεικνυόμενο καύσιμο: ${remainingEachNow.toFixed(0)} L / δεξαμενή + 14 L χωρίς ένδειξη\n` +
+        `Bingo στο κλιμάκιο: ${bingoL.toFixed(0)} L συνολικά\n` +
+        `  = καύσιμο κλιμάκιο → εναλλακτικό, όχι κάτω από 1/4 ανά δεξαμενή (${minQuarterTotal.toFixed(0)} L)\n` +
+        `Joker στην περιοχή πυρκαγιάς: ${jokerL.toFixed(0)} L συνολικά\n` +
+        `  = καύσιμο πυρκαγιά → κλιμάκιο + Bingo\n` +
+        `Κατάσταση Bingo: ${bingoStatus}\n` +
+        `Κατάσταση Joker: ${jokerStatus}\n` +
+        `Κατανάλωση μετρά αυτόματα μόνο όταν GS > 100 km/h και σταματά όταν GS < 30 km/h.\n` +
+        `Παραδοχή: κατανάλωση ${burn} L/h, ισομερής κατανάλωση από τις δύο δεξαμενές και 14 L μη ενδεικνυόμενα.`;
+      setText("dashFuel", `${remainingTotalNow.toFixed(0)} L`);
+      setText("dashBingo", `${bingoL.toFixed(0)} L`);
+      setText("dashJoker", `${jokerL.toFixed(0)} L`);
+      const fuelCard = document.getElementById("dashFuelCard");
+      if (fuelCard) {
+        fuelCard.className = remainingTotalNow < bingoL ? "dash-card bad" : (remainingTotalNow < jokerL ? "dash-card warn" : "dash-card");
+      }
+    }
+
+    function updateFuelGauges(leftL, rightL) {
+      function setGauge(needleId, textId, liters) {
+        const pct = Math.max(0, Math.min(1, liters / tankCapacityL));
+        // Photo-like semi-arc: E=-72°, 1/4=-36°, 1/2=0°, 3/4=36°, F=72°
+        const angle = -72 + pct * 144;
+        document.getElementById(needleId).style.transform = `rotate(${angle}deg)`;
+        document.getElementById(textId).textContent = `${Math.max(0, liters).toFixed(0)} L`;
+      }
+      setGauge("leftNeedle", "leftGaugeText", leftL);
+      setGauge("rightNeedle", "rightGaugeText", rightL);
+    }
+
+    function updateWindResult() {
+      const rwy = Number(document.getElementById("runwayHeading").value || 0);
+      const windFrom = Number(document.getElementById("windDir").value || 0);
+      const windSpeed = Number(document.getElementById("windSpeed").value || 0);
+      const gust = Number(document.getElementById("windGust").value || 0);
+      const effective = Math.max(windSpeed, gust);
+      const angle = normAngleDiff(windFrom, rwy);
+      const cross = Math.abs(effective * Math.sin(deg2rad(angle)));
+      const head = effective * Math.cos(deg2rad(angle));
+      const status = (cross <= pzlMaxCrosswindKts && effective <= pzlMaxWindKts) ? "ΕΝΤΟΣ ΟΡΙΩΝ" : "ΕΚΤΟΣ ΟΡΙΩΝ";
+
+      document.getElementById("windResult").innerHTML =
+        `Γωνία ανέμου ως προς διάδρομο: ${angle.toFixed(0)}°\n` +
+        `Υπολογισμός με ένταση/ριπή: ${effective.toFixed(0)} kts\n` +
+        `Κάθετος: ${cross.toFixed(1)} kts / όριο PZL ${pzlMaxCrosswindKts} kts\n` +
+        `${head >= 0 ? "Μετωπικός" : "Ουραίος"}: ${Math.abs(head).toFixed(1)} kts\n` +
+        `Γενική ένταση: ${effective.toFixed(1)} kts / όριο ${pzlMaxWindKts} kts\n` +
+        `Κατάσταση: ${status}`;
+    }
+
+    function updateFireWindResult() {
+      const dir = Number(document.getElementById("fireWindDir").value || 0);
+      const spd = Number(document.getElementById("fireWindSpeed").value || 0);
+      document.getElementById("fireWindResult").textContent =
+        `Άνεμος στην πυρκαγιά: από ${String(dir).padStart(3,"0")}° / ${spd} kts. Η μύτη του βέλους δείχνει προς τα πού φυσά ο άνεμος.`;
+    }
+
+    function addMinutes(date, minutes){ return new Date(date.getTime()+minutes*60000); }
+    function fmtTime(date){ const h=String(date.getHours()).padStart(2,"0"); const m=String(date.getMinutes()).padStart(2,"0"); return `${h}:${m}`; }
+    function toHHMM(date){ return fmtTime(date); }
+
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js").catch(() => {});
+      });
+    }
+
+    updateFuelGauges(356,356);
+    updateWindResult();
+    updateFireWindResult();
+    drawAll();
+  
+</script>
+</body>
+</html>
