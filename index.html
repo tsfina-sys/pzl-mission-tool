@@ -108,8 +108,21 @@
         <div><label>Αρχικό ανά δεξαμενή L</label><input id="initialTankFuel" type="number" value="356" min="0" max="356" /></div>
         <div><label>Reserve Bingo L</label><input id="reserveFuel" type="number" value="0" min="0" /></div>
         <div><label>Reserve Joker L</label><input id="jokerReserveFuel" type="number" value="0" min="0" /></div>
-      </div>
-      <div id="fuelResult" class="result">Αναμονή δεδομένων καυσίμων...</div>
+      </div><div class="grid2">
+  <div>
+    <label>Αριστερή δεξαμενή L</label>
+    <input id="manualLeftFuel" type="number" min="0" max="356" placeholder="π.χ. 300" />
+  </div>
+
+  <div>
+    <label>Δεξιά δεξαμενή L</label>
+    <input id="manualRightFuel" type="number" min="0" max="356" placeholder="π.χ. 300" />
+  </div>
+</div>
+<div style="margin-top:8px">
+  <button id="updateFuelBtn">UPDATE FUEL</button>
+</div>
+      servi>Αναμονή δεδομένων καυσίμων...</div>
       <div class="analog-gauge-wrap">
         <div><div class="analog-gauge"><div class="gauge-arc"></div><div class="tick tick-e"></div><div class="tick tick-14"></div><div class="tick tick-12"></div><div class="tick tick-34"></div><div class="tick tick-f"></div><div class="gauge-mark mark-e">E</div><div class="gauge-mark mark-14">1/4</div><div class="gauge-mark mark-12">1/2</div><div class="gauge-mark mark-34">3/4</div><div class="gauge-mark mark-f">F</div><div class="gauge-title">FUEL QTY.</div><div id="leftNeedle" class="needle"></div><div class="gauge-center"></div></div><div class="gauge-value">Αριστερή: <span id="leftGaugeText">356 L</span></div></div>
         <div><div class="analog-gauge"><div class="gauge-arc"></div><div class="tick tick-e"></div><div class="tick tick-14"></div><div class="tick tick-12"></div><div class="tick tick-34"></div><div class="tick tick-f"></div><div class="gauge-mark mark-e">E</div><div class="gauge-mark mark-14">1/4</div><div class="gauge-mark mark-12">1/2</div><div class="gauge-mark mark-34">3/4</div><div class="gauge-mark mark-f">F</div><div class="gauge-title">FUEL QTY.</div><div id="rightNeedle" class="needle"></div><div class="gauge-center"></div></div><div class="gauge-value">Δεξιά: <span id="rightGaugeText">356 L</span></div></div>
@@ -834,7 +847,32 @@ dropsDiv.innerHTML = html;
         navigator.serviceWorker.register("service-worker.js").catch(() => {});
       });
     }
+document.getElementById("updateFuelBtn").addEventListener("click", () => {
+  const left = Number(document.getElementById("manualLeftFuel").value);
+  const right = Number(document.getElementById("manualRightFuel").value);
 
+  if (isNaN(left) || isNaN(right)) {
+    alert("Βάλε ένδειξη και για τις δύο δεξαμενές.");
+    return;
+  }
+
+  const safeLeft = Math.max(0, Math.min(tankCapacityL, left));
+  const safeRight = Math.max(0, Math.min(tankCapacityL, right));
+
+  const initialEach = Math.min(
+    tankCapacityL,
+    Number(document.getElementById("initialTankFuel").value || 356)
+  );
+
+  const totalInitial = initialEach * 2 + hiddenFuelL;
+  const actualTotal = safeLeft + safeRight + hiddenFuelL;
+
+  calculatedFuelBurnedL = Math.max(0, totalInitial - actualTotal);
+
+  updateFuelGauges(safeLeft, safeRight);
+  updateFlightStatus();
+  calculate();
+});
     updateFuelGauges(356,356);
     updateWindResult();
     updateFireWindResult();
