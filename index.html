@@ -60,7 +60,33 @@
     .tick-e { transform:rotate(-72deg); } .tick-14 { transform:rotate(-36deg); } .tick-12 { transform:rotate(0deg); height:25px; } .tick-34 { transform:rotate(36deg); } .tick-f { transform:rotate(72deg); }
     .gauge-value { text-align:center; font-size:11px; margin-top:6px; font-weight:bold; }
     @media (min-width:900px) { #app { flex-direction:row; } #mapWrap { height:100vh; min-height:100vh; flex:1.65; } #map { inset:42px 0 0 0; } .bottom-sheet { border-radius:0; max-height:100vh; width:440px; overflow:auto; } .dashboard { grid-template-columns:repeat(2,1fr); } }
-    @media (max-width:480px) { .dashboard { grid-template-columns:repeat(2,1fr); } .value { font-size:16px; } .bottom-sheet { max-height:55vh; } }
+    @media (max-width:480px) {
+  .dashboard { grid-template-columns:repeat(2,1fr); }
+
+  .value { font-size:16px; }
+
+  .analog-gauge-wrap{
+    justify-content:center;
+    gap:6px;
+  }
+
+  .analog-gauge{
+    width:110px;
+    height:80px;
+  }
+
+  .gauge-title{
+    font-size:16px;
+  }
+
+  .gauge-value{
+    font-size:10px;
+  }
+
+  .mark-e,.mark-f,.mark-14,.mark-12{
+    font-size:18px;
+  }
+}
   </style>
 </head>
 <body>
